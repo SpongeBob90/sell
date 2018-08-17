@@ -1,17 +1,17 @@
 <template>
   <div class="goods">
-    <div class="menu-wrapper" ref="menu-wrapper">
+    <div class="menu-wrapper" ref="menu">
       <ul>
-        <li v-for="item in goods" class="menu-item" :key="item.id">
+        <li v-for="(item, index) in goods" :class="{current: currentIndex === index}" class="menu-item" :key="index" @click="selectMenu(index,$event)">
           <span class="text border-1px">
             <span v-show="item.type>0" class="icon" :class="classMap[item.type]"></span>{{item.name}}
           </span>
         </li>
       </ul>
     </div>
-    <div class="foods-wrapper" ref="foods-wrapper">
+    <div class="foods-wrapper" ref="foods">
       <ul>
-        <li v-for="item in goods" :key="item.id">
+        <li v-for="item in goods" class="food-list-hook" :key="item.id">
           <h1 class="title">{{item.name}}</h1>
           <ul>
             <li v-for="food in item.foods" class="food-item border-1px" :key="food.id">
@@ -22,12 +22,13 @@
                 <h2 class="name">{{food.name}}</h2>
                 <p class="desc">{{food.description}}</p>
                 <div class="extra">
-                  <span class="count">月售{{food.sellCount}}份</span>
-                  <span>好评率{{food.rating}}%</span>
+                  <span class="count">月售{{food.sellCount}}份</span><span>好评率{{food.rating}}%</span>
                 </div>
                 <div class="price">
-                  <span class="now">￥{{food.price}}</span>
-                  <span class="old" v-show="food.oldPrice">￥{{food.oldPrice}}</span>
+                  <span class="now">￥{{food.price}}</span><span class="old" v-show="food.oldPrice">￥{{food.oldPrice}}</span>
+                </div>
+                <div class="cartcontrol-wrapper">
+                  <cartcontrol :food="food" @cartAdd="_drop"></cartcontrol>
                 </div>
               </div>
             </li>
@@ -35,11 +36,14 @@
         </li>
       </ul>
     </div>
+    <shopcart ref="shopcart" :select-foods="selectFoods" :delivery-price="seller.deliveryPrice" :min-price="seller.minPrice"></shopcart>
   </div>
 </template>
 
 <script type="text/ecmascript-6">
 import BScroll from 'better-scroll'
+import shopcart from '@/components/shopcart/shopcart'
+import cartcontrol from '@/components/cartcontrol/cartcontrol'
 
 const ERR_OK = 0
 
@@ -51,7 +55,11 @@ export default {
   },
   data() {
     return {
-      goods: []
+      goods: [],
+      listHeight: [],
+      scrollY: 0,
+      menuWrapper: Object,
+      foodsWrapper: Object
     }
   },
   created() {
@@ -63,14 +71,75 @@ export default {
         this.goods = response.data
         this.$nextTick(() => {
           this._initScroll()
+          this._calculateHeight()
         })
       }
     })
   },
   methods: {
+    _drop(target) {
+      this.$nextTick(() => {
+        this.$refs.shopcart.drop(target)
+      })
+    },
     _initScroll() {
-      this.meunScroll
+      this.menuWrapper = new BScroll(this.$refs.menu, {
+        click: true
+      })
+      this.foodsWrapper = new BScroll(this.$refs.foods, {
+        click: true,
+        probeType: 3
+      })
+      this.foodsWrapper.on('scroll', (pos) => {
+        this.scrollY = Math.abs(Math.round(pos.y))
+      })
+    },
+    _calculateHeight() {
+      let foodList = this.$refs.foods.getElementsByClassName('food-list-hook')
+      let height = 0
+      this.listHeight.push(height)
+      for (let i = 0; i < foodList.length; i++) {
+        let item = foodList[i]
+        height += item.clientHeight
+        this.listHeight.push(height)
+      }
+    },
+    selectMenu(index, event) {
+      if (!event._constructed) {
+        return false
+      } else {
+        let foodList = this.$refs.foods.getElementsByClassName('food-list-hook')
+        let el = foodList[index]
+        this.foodsWrapper.scrollToElement(el, 300)
+      }
     }
+  },
+  computed: {
+    currentIndex() {
+      for (let i = 0; i < this.listHeight.length; i++) {
+        let height = this.listHeight[i]
+        let height2 = this.listHeight[i + 1]
+        if (!height2 || (this.scrollY >= height && this.scrollY < height2)) {
+          return i
+        }
+      }
+      return 0
+    },
+    selectFoods() {
+      let foods = []
+      this.goods.forEach((good) => {
+        good.foods.forEach((food) => {
+          if (food.count) {
+            foods.push(food)
+          }
+        })
+      })
+      return foods
+    }
+  },
+  components: {
+    shopcart,
+    cartcontrol
   }
 }
 </script>
@@ -119,6 +188,14 @@ export default {
         vertical-align: middle
         border-1px(rgba(7,17,27,0.1))
         font-size: 12px
+      &.current
+        position: relative
+        z-index: 10
+        margin-top: -1px
+        background: #fff
+        font-weight: 700
+        .text
+          border-none()
   .foods-wrapper
     flex: 1
     .title
@@ -153,10 +230,11 @@ export default {
           font-size: 10px
           color: rgb(147,153,159)
         .desc
+          line-height: 12px
           margin-bottom: 8px
         .extra
-          &.count
-            margin-bottom: 12px
+          .count
+            margin-right: 12px
         .price
           font-weight: 700
           line-height: 24px
@@ -168,4 +246,8 @@ export default {
             text-decoration: line-through
             font-size: 10px
             color: rgb(147,153,159)
+        .cartcontrol-wrapper
+          position: absolute
+          right: 0
+          bottom: 12px
 </style>
