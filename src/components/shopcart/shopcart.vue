@@ -186,6 +186,7 @@ export default {
     },
     toggleList() {
       if (this.totalCount) {
+        this.fold = !this.fold
         this.$nextTick(() => {
           if (this.scroll) {
             this.scroll.refresh()
@@ -193,10 +194,8 @@ export default {
             this.scroll = new BScroll(this.$refs.list, {
               click: true
             })
-            console.log(this.scroll)
           }
         })
-        this.fold = !this.fold
       }
     },
     empty() {
